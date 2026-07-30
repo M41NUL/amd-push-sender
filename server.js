@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const express = require('express');
+const path = require('path');
 
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   console.error('Missing FIREBASE_SERVICE_ACCOUNT environment variable.');
@@ -15,12 +16,40 @@ admin.initializeApp({
 const db = admin.firestore();
 const messaging = admin.messaging();
 
+const BOOT_TIME = Date.now();
+const MAX_LOGS = 200;
+const MAX_NOTIFICATIONS = 100;
+
+const state = {
+  logs: [],
+  notifications: [],
+  totalCalls: 0,
+  totalSuccess: 0,
+  totalFailed: 0
+};
+
+function pushLog(text, level) {
+  state.logs.unshift({
+    time: new Date().toISOString(),
+    level: level || 'info',
+    text
+  });
+  if (state.logs.length > MAX_LOGS) state.logs.pop();
+  if (level === 'error') console.error(text);
+  else console.log(text);
+}
+
+function pushNotification(entry) {
+  state.notifications.unshift(entry);
+  if (state.notifications.length > MAX_NOTIFICATIONS) state.notifications.pop();
+}
+
 async function sendToAllSubscribers(title, message, image, link) {
   const tokensSnap = await db.collection('push_tokens').get();
   const tokens = tokensSnap.docs.map((doc) => doc.id);
 
   if (tokens.length === 0) {
-    console.log('No subscribers to send to.');
+    pushLog('No subscribers to send to.', 'warn');
     return { successCount: 0, failureCount: 0 };
   }
 
@@ -57,7 +86,7 @@ async function sendToAllSubscribers(title, message, image, link) {
       batch.delete(db.collection('push_tokens').doc(token));
     });
     await batch.commit();
-    console.log(`Removed ${invalidTokens.length} invalid token(s).`);
+    pushLog(`Removed ${invalidTokens.length} invalid token(s).`, 'warn');
   }
 
   return {
@@ -78,7 +107,8 @@ function startQueueListener() {
           const data = doc.data();
           if (data.sent) return;
 
-          console.log(`Processing queued notification: ${doc.id}`);
+          state.totalCalls++;
+          pushLog(`Processing queued notification: ${doc.id}`);
           try {
             const result = await sendToAllSubscribers(data.title, data.message, data.image, data.link);
             await doc.ref.update({
@@ -87,11 +117,38 @@ function startQueueListener() {
               successCount: result.successCount,
               failureCount: result.failureCount
             });
-            console.log(
-              `Sent "${data.title}" — success: ${result.successCount}, failed: ${result.failureCount}`
+            state.totalSuccess += result.successCount;
+            state.totalFailed += result.failureCount;
+            pushLog(
+              `Sent "${data.title}" — success: ${result.successCount}, failed: ${result.failureCount}`,
+              'success'
             );
+            pushNotification({
+              id: doc.id,
+              title: data.title || '',
+              message: data.message || '',
+              image: data.image || null,
+              link: data.link || null,
+              successCount: result.successCount,
+              failureCount: result.failureCount,
+              status: result.failureCount > 0 && result.successCount === 0 ? 'failed' : 'success',
+              time: new Date().toISOString()
+            });
           } catch (err) {
-            console.error(`Failed to send notification ${doc.id}:`, err.message);
+            state.totalFailed++;
+            pushLog(`Failed to send notification ${doc.id}: ${err.message}`, 'error');
+            pushNotification({
+              id: doc.id,
+              title: data.title || '',
+              message: data.message || '',
+              image: data.image || null,
+              link: data.link || null,
+              successCount: 0,
+              failureCount: 1,
+              status: 'failed',
+              error: err.message,
+              time: new Date().toISOString()
+            });
             await doc.ref.update({
               sent: true,
               sentAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -101,18 +158,32 @@ function startQueueListener() {
         });
       },
       (err) => {
-        console.error('Queue listener error:', err.message);
+        pushLog(`Queue listener error: ${err.message}`, 'error');
       }
     );
 
-  console.log('Listening for queued push notifications...');
+  pushLog('Listening for queued push notifications...');
 }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.static(path.join(__dirname, 'public')));
+
 app.get('/', (req, res) => {
-  res.send('All Media Downloader push sender is running.');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/api/status', (req, res) => {
+  res.json({
+    bootTime: BOOT_TIME,
+    uptimeSeconds: Math.floor((Date.now() - BOOT_TIME) / 1000),
+    totalCalls: state.totalCalls,
+    totalSuccess: state.totalSuccess,
+    totalFailed: state.totalFailed,
+    logs: state.logs,
+    notifications: state.notifications
+  });
 });
 
 app.get('/health', (req, res) => {
@@ -120,6 +191,6 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Push sender HTTP server listening on port ${PORT}`);
+  pushLog(`Push sender HTTP server listening on port ${PORT}`);
   startQueueListener();
 });
