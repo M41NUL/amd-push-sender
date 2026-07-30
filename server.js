@@ -15,7 +15,7 @@ admin.initializeApp({
 const db = admin.firestore();
 const messaging = admin.messaging();
 
-async function sendToAllSubscribers(title, message) {
+async function sendToAllSubscribers(title, message, image, link) {
   const tokensSnap = await db.collection('push_tokens').get();
   const tokens = tokensSnap.docs.map((doc) => doc.id);
 
@@ -28,6 +28,10 @@ async function sendToAllSubscribers(title, message) {
     notification: {
       title: title || 'All Media Downloader',
       body: message || ''
+    },
+    data: {
+      link: link || 'https://all-media-downloader-web.vercel.app',
+      image: image || ''
     },
     tokens
   };
@@ -76,7 +80,7 @@ function startQueueListener() {
 
           console.log(`Processing queued notification: ${doc.id}`);
           try {
-            const result = await sendToAllSubscribers(data.title, data.message);
+            const result = await sendToAllSubscribers(data.title, data.message, data.image, data.link);
             await doc.ref.update({
               sent: true,
               sentAt: admin.firestore.FieldValue.serverTimestamp(),

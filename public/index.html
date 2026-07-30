@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>AMD Push Sender — Status</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+:root {
+  --bg: #000;
+  --accent: #0A84FF;
+  --accent-dim: rgba(10,132,255,0.15);
+  --accent-glow: rgba(10,132,255,0.28);
+  --text: #fff;
+  --text2: rgba(235,235,245,.8);
+  --text3: rgba(235,235,245,.55);
+  --text4: rgba(235,235,245,.3);
+  --green: #30d158;
+  --red: #ff453a;
+  --amber: #ff9f0a;
+  --glass-bg: rgba(28,28,30,0.45);
+  --glass-bg-strong: rgba(28,28,30,0.6);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-border-hi: rgba(255,255,255,0.18);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-blur-sm: blur(14px) saturate(160%);
+  --radius-lg: 18px;
+  --radius-md: 14px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { background: var(--bg); }
+body {
+  font-family: -apple-system, 'Inter', BlinkMacSystemFont, sans-serif;
+  color: var(--text);
+  min-height: 100dvh;
+  padding-bottom: 48px;
+  background-image: radial-gradient(circle at 50% -10%, rgba(10,132,255,0.10), transparent 55%);
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px; border-bottom: 1px solid var(--glass-border);
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; }
+.topbar-icon {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--accent-dim); border: 1px solid var(--glass-border-hi);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); font-size: 14px;
+}
+.topbar-title { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; }
+.status-dot-wrap { display: flex; align-items: center; gap: 7px; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulseDot 2s ease-in-out infinite;
+}
+@keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.status-dot.offline { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.status-label { font-size: 12px; color: var(--text3); font-weight: 600; letter-spacing: .3px; }
+
+.container { max-width: 720px; margin: 0 auto; padding: 20px 16px 0; }
+
+.hero-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  padding: 26px 22px; margin-bottom: 16px;
+  position: relative; overflow: hidden;
+}
+.hero-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.hero-eyebrow i { color: var(--accent); font-size: 11px; }
+.uptime-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 40px; font-weight: 600; letter-spacing: .5px;
+  color: var(--text); line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.uptime-unit { font-size: 15px; color: var(--text3); font-weight: 500; margin-left: 4px; }
+.uptime-since { font-size: 12px; color: var(--text4); margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
+.stat-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md); backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+  padding: 16px 14px;
+}
+.stat-icon { font-size: 13px; color: var(--text3); margin-bottom: 10px; }
+.stat-value {
+  font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 600;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.stat-value.success { color: var(--green); }
+.stat-value.failed { color: var(--red); }
+.stat-label { font-size: 10.5px; color: var(--text3); margin-top: 6px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+
+.section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--text3); margin: 22px 2px 10px;
+}
+.section-title i { color: var(--accent); font-size: 12px; width: 14px; }
+
+.terminal {
+  background: #050505; border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  margin-bottom: 8px;
+}
+.terminal-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 11px 14px; border-bottom: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.02);
+}
+.term-dot { width: 9px; height: 9px; border-radius: 50%; }
+.term-dot.r { background: #ff5f56; }
+.term-dot.y { background: #ffbd2e; }
+.term-dot.g { background: #27c93f; }
+.terminal-head span { margin-left: 6px; font-size: 11px; color: var(--text4); font-family: 'JetBrains Mono', monospace; }
+.terminal-body {
+  padding: 14px; max-height: 320px; overflow-y: auto;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.85;
+}
+.log-line { display: flex; gap: 9px; white-space: pre-wrap; word-break: break-word; }
+.log-time { color: var(--text4); flex-shrink: 0; }
+.log-text.info { color: var(--text2); }
+.log-text.success { color: var(--green); }
+.log-text.warn { color: var(--amber); }
+.log-text.error { color: var(--red); }
+.log-caret { color: var(--accent); flex-shrink: 0; }
+.terminal-empty { color: var(--text4); }
+
+.notif-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.notif-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md); backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+  padding: 14px 15px;
+}
+.notif-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.notif-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.notif-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 20px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 4px;
+}
+.notif-badge.success { background: rgba(48,209,88,0.12); color: var(--green); border: 1px solid rgba(48,209,88,0.25); }
+.notif-badge.failed { background: rgba(255,69,58,0.12); color: var(--red); border: 1px solid rgba(255,69,58,0.25); }
+.notif-message { font-size: 12.5px; color: var(--text3); line-height: 1.5; margin-bottom: 8px; }
+.notif-meta { display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--text4); font-family: 'JetBrains Mono', monospace; }
+.notif-meta span { display: flex; align-items: center; gap: 5px; }
+.notif-meta i { font-size: 10px; }
+
+.empty-state {
+  text-align: center; padding: 34px 20px; color: var(--text4);
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+.empty-state i { font-size: 20px; margin-bottom: 10px; display: block; color: var(--text4); }
+.empty-state p { font-size: 12.5px; }
+
+.footer-note {
+  text-align: center; font-size: 11px; color: var(--text4);
+  margin-top: 28px; font-family: 'JetBrains Mono', monospace;
+}
+
+@media (max-width: 420px) {
+  .uptime-value { font-size: 32px; }
+  .stat-value { font-size: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+    <div class="topbar-title">AMD Push Sender</div>
+  </div>
+  <div class="status-dot-wrap">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-label" id="statusLabel">Live</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="hero-card">
+    <div class="hero-eyebrow"><i class="fa-solid fa-signal"></i>Server Uptime</div>
+    <div class="uptime-value" id="uptimeValue">—</div>
+    <div class="uptime-since" id="uptimeSince">Connecting...</div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="fa-solid fa-paper-plane"></i></div>
+      <div class="stat-value" id="statCalls">0</div>
+      <div class="stat-label">API Calls</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+      <div class="stat-value success" id="statSuccess">0</div>
+      <div class="stat-label">Delivered</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+      <div class="stat-value failed" id="statFailed">0</div>
+      <div class="stat-label">Failed</div>
+    </div>
+  </div>
+
+  <div class="section-title"><i class="fa-solid fa-bell"></i>Recent Notifications</div>
+  <div class="notif-list" id="notifList">
+    <div class="empty-state"><i class="fa-solid fa-inbox"></i><p>No notifications sent yet</p></div>
+  </div>
+
+  <div class="section-title"><i class="fa-solid fa-terminal"></i>Live Logs</div>
+  <div class="terminal">
+    <div class="terminal-head">
+      <div class="term-dot r"></div><div class="term-dot y"></div><div class="term-dot g"></div>
+      <span>amd-push-sender — live</span>
+    </div>
+    <div class="terminal-body" id="terminalBody">
+      <div class="terminal-empty">Waiting for log stream...</div>
+    </div>
+  </div>
+
+  <div class="footer-note">All Media Downloader — Push Sender Service</div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function formatDuration(totalSeconds) {
+  const d = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  const parts = [];
+  if (d > 0) parts.push(String(d).padStart(2,'0') + 'd');
+  parts.push(String(h).padStart(2,'0') + 'h');
+  parts.push(String(m).padStart(2,'0') + 'm');
+  parts.push(String(s).padStart(2,'0') + 's');
+  return parts.join(' ');
+}
+
+function timeAgo(iso) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 5) return 'just now';
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function formatClock(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+let liveUptimeSeconds = 0;
+let bootTime = null;
+
+function tickUptime() {
+  if (bootTime === null) return;
+  liveUptimeSeconds = Math.floor((Date.now() - bootTime) / 1000);
+  $('uptimeValue').textContent = formatDuration(liveUptimeSeconds);
+}
+setInterval(tickUptime, 1000);
+
+function renderLogs(logs) {
+  const el = $('terminalBody');
+  if (!logs.length) {
+    el.innerHTML = '<div class="terminal-empty">Waiting for log stream...</div>';
+    return;
+  }
+  el.innerHTML = logs.map(l => `
+    <div class="log-line">
+      <span class="log-time">${formatClock(l.time)}</span>
+      <span class="log-caret">${'>'}</span>
+      <span class="log-text ${l.level}">${escapeHtml(l.text)}</span>
+    </div>
+  `).join('');
+}
+
+function renderNotifications(list) {
+  const el = $('notifList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>No notifications sent yet</p></div>';
+    return;
+  }
+  el.innerHTML = list.slice(0, 12).map(n => `
+    <div class="notif-card">
+      <div class="notif-top">
+        <div class="notif-title">${escapeHtml(n.title || 'Untitled')}</div>
+        <div class="notif-badge ${n.status}">
+          <i class="fa-solid ${n.status === 'success' ? 'fa-check' : 'fa-xmark'}"></i>
+          ${n.status === 'success' ? 'Sent' : 'Failed'}
+        </div>
+      </div>
+      ${n.message ? `<div class="notif-message">${escapeHtml(n.message)}</div>` : ''}
+      <div class="notif-meta">
+        <span><i class="fa-solid fa-check-double"></i>${n.successCount}</span>
+        <span><i class="fa-solid fa-triangle-exclamation"></i>${n.failureCount}</span>
+        <span><i class="fa-solid fa-clock"></i>${timeAgo(n.time)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function refreshStatus() {
+  try {
+    const res = await fetch('/api/status', { cache: 'no-store' });
+    const data = await res.json();
+
+    bootTime = data.bootTime;
+    liveUptimeSeconds = data.uptimeSeconds;
+    $('uptimeValue').textContent = formatDuration(liveUptimeSeconds);
+    $('uptimeSince').textContent = 'Since ' + new Date(data.bootTime).toLocaleString();
+
+    $('statCalls').textContent = data.totalCalls;
+    $('statSuccess').textContent = data.totalSuccess;
+    $('statFailed').textContent = data.totalFailed;
+
+    renderLogs(data.logs);
+    renderNotifications(data.notifications);
+
+    $('statusDot').classList.remove('offline');
+    $('statusLabel').textContent = 'Live';
+  } catch (err) {
+    $('statusDot').classList.add('offline');
+    $('statusLabel').textContent = 'Offline';
+  }
+}
+
+refreshStatus();
+setInterval(refreshStatus, 5000);
+</script>
+
+</body>
+</html>
