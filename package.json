@@ -1,0 +1,16 @@
+{
+  "name": "amd-push-sender",
+  "version": "1.0.0",
+  "description": "Standalone push notification sender for All Media Downloader admin panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "firebase-admin": "^12.1.0"
+  }
+}
